@@ -2338,7 +2338,7 @@ def create_gui():
             export_button.config(state=tk.DISABLED)
 
     # 识别按钮
-    recognize_button = tk.Button(top_frame, text="图纸取值识别", command=start_recognition, font=big_font, width=12, bg="#4CAF50", fg="white")
+    recognize_button = tk.Button(top_frame, text="识别图纸取值", command=start_recognition, font=big_font, width=12, bg="#4CAF50", fg="white")
     recognize_button.pack(side=tk.LEFT, padx=5)
 
     # 对比按钮
