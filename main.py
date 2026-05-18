@@ -1871,6 +1871,11 @@ def create_gui():
     root.title("DrawMaster_DS_V1.0_20260331—DataSheet参数提取及对比工具")
     root.geometry("1000x700")
 
+    try:
+        root.iconbitmap("logo.ico")
+    except Exception:
+        pass  # 如果图标文件不存在，忽略错误
+
     # 窗口最大化
     root.state('zoomed')
 
@@ -1884,6 +1889,7 @@ def create_gui():
 
     # 设置字体
     font = ("ABBvoice CNSG", 10)
+    big_font = ("ABBvoice CNSG", 12)
 
     # 设置Treeview字体和行高
     style = ttk.Style()
@@ -1900,10 +1906,10 @@ def create_gui():
     top_frame.pack(fill=tk.X)
 
     # 文件路径Entry
-    tk.Label(top_frame, text="PDF文件:", font=font).pack(side=tk.LEFT, padx=5)
+    tk.Label(top_frame, text="PDF文件:", font=big_font).pack(side=tk.LEFT, padx=5)
 
     pdf_path_var = tk.StringVar()
-    pdf_entry = tk.Entry(top_frame, textvariable=pdf_path_var, width=50, font=font)
+    pdf_entry = tk.Entry(top_frame, textvariable=pdf_path_var, width=80, font=big_font)
     pdf_entry.pack(side=tk.LEFT, padx=5)
 
     # 选择文件按钮
@@ -1953,7 +1959,7 @@ def create_gui():
             compare_button.config(state=tk.DISABLED)
             export_button.config(state=tk.DISABLED)
 
-    tk.Button(top_frame, text="选择", command=select_pdf, font=font, width=8).pack(side=tk.LEFT, padx=5)
+    tk.Button(top_frame, text="选择图纸", command=select_pdf, font=big_font, width=8).pack(side=tk.LEFT, padx=5)
 
     # 识别按钮
     def start_recognition():
@@ -2246,7 +2252,7 @@ def create_gui():
                                     attr_name_text.config(state=tk.DISABLED)
 
                                     # 识别的值
-                                    recognized_value_text = tk.Text(attr_frame, font=font, width=50, height=max_lines, wrap=tk.WORD,
+                                    recognized_value_text = tk.Text(attr_frame, font=font, width=60, height=max_lines, wrap=tk.WORD,
                                                                     bg='#ffffff', fg='#333333', borderwidth=1, relief='solid')
                                     recognized_value_text.pack(side=tk.LEFT, padx=5)
                                     recognized_value_text.insert(tk.END, attr_value)
@@ -2254,7 +2260,7 @@ def create_gui():
 
                                     # 对比表格读取的值
                                     # 这里需要从对比表格中获取对应的值，暂时显示为空
-                                    compare_value_text = tk.Text(attr_frame, font=font, width=50, height=max_lines, wrap=tk.WORD,
+                                    compare_value_text = tk.Text(attr_frame, font=font, width=60, height=max_lines, wrap=tk.WORD,
                                                                  bg='#f0f8ff', fg='#333333', borderwidth=1, relief='solid')
                                     compare_value_text.pack(side=tk.LEFT, padx=5)
 
@@ -2332,7 +2338,7 @@ def create_gui():
             export_button.config(state=tk.DISABLED)
 
     # 识别按钮
-    recognize_button = tk.Button(top_frame, text="识别", command=start_recognition, font=font, width=8, bg="#4CAF50", fg="white")
+    recognize_button = tk.Button(top_frame, text="图纸取值识别", command=start_recognition, font=big_font, width=12, bg="#4CAF50", fg="white")
     recognize_button.pack(side=tk.LEFT, padx=5)
 
     # 对比按钮
@@ -2533,8 +2539,152 @@ def create_gui():
         # 启用导出按钮
         export_button.config(state=tk.NORMAL)
 
+        # 显示统计信息窗口
+        show_summary_statistics()
+
+    def show_summary_statistics():
+        """
+        显示统计信息窗口，展示属性和统计情况（Summary的第1,2列）
+        """
+        if not all_pages_data:
+            return
+
+        # 创建Toplevel窗口
+        stats_window = tk.Toplevel(root)
+        stats_window.title("各站属性取值对比")
+        stats_window.geometry("1000x800")
+        stats_window.transient(root)  # 设置为父窗口的临时窗口
+        stats_window.grab_set()  # 模态窗口
+        stats_window.iconbitmap("logo.ico")
+        # 窗口居中显示
+        stats_window.update_idletasks()
+        screen_width = stats_window.winfo_screenwidth()
+        screen_height = stats_window.winfo_screenheight()
+        x = (screen_width - stats_window.winfo_width()) // 2
+        y = (screen_height - stats_window.winfo_height()) // 2
+        stats_window.geometry(f"+{x}+{y}")
+
+        # 创建主框架
+        main_frame = tk.Frame(stats_window, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # # 标题
+        # title_label = tk.Label(main_frame, text="各站图纸取值对比", font=(font[0], font[1], 'bold'))
+        # title_label.pack(pady=(0, 10))
+
+        # 创建Canvas和滚动条
+        canvas_frame = tk.Frame(main_frame)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(canvas_frame, bg='white')
+        scrollbar_y = tk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=canvas.yview)
+        scrollbar_x = tk.Scrollbar(canvas_frame, orient=tk.HORIZONTAL, command=canvas.xview)
+
+        canvas.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # 创建内部框架
+        inner_frame = tk.Frame(canvas, bg='white')
+        canvas_window = canvas.create_window((0, 0), window=inner_frame, anchor='nw')
+
+        # 表头
+        header_frame = tk.Frame(inner_frame, bg='#E0E0E0')
+        header_frame.pack(fill=tk.X, pady=(0, 5))
+
+        attr_header = tk.Label(header_frame, text="属性", font=(font[0], font[1], 'bold'),
+                               bg='#E0E0E0', width=30, anchor='w')
+        attr_header.pack(side=tk.LEFT, padx=5)
+
+        stats_header = tk.Label(header_frame, text="各站图纸取值", font=(font[0], font[1], 'bold'),
+                                bg='#E0E0E0', width=50, anchor='w')
+        stats_header.pack(side=tk.LEFT, padx=5)
+
+        # 获取所有属性
+        all_attributes = []
+        attr_set = set()
+        for page_data in all_pages_data:
+            for attr in page_data['attributes']:
+                if attr['name'] not in attr_set:
+                    attr_set.add(attr['name'])
+                    all_attributes.append(attr['name'])
+
+        station_names = [page_data['title'] for page_data in all_pages_data]
+
+        # 填充数据
+        for attr_name in all_attributes:
+            values_by_station = {}
+            for page_data in all_pages_data:
+                station_name = page_data['title']
+                value = ""
+                for attr in page_data['attributes']:
+                    if attr['name'] == attr_name:
+                        value = attr['recognized_value']
+                        break
+                values_by_station[station_name] = value if value.strip() else " "
+
+            # 生成统计信息
+            stats, value_count = generate_statistics(station_names, values_by_station)
+
+            # 创建行框架
+            row_frame = tk.Frame(inner_frame, bg='white')
+            row_frame.pack(fill=tk.X, pady=2)
+
+            # 计算行高
+            stats_lines = stats.count('\n') + 1
+            row_height = max(1, stats_lines)
+
+            # 确定背景色和字体颜色（有多种值时标红）
+            has_multiple_values = value_count > 1
+            attr_bg = '#ff0000' if has_multiple_values else '#f8f9fa'
+            attr_fg = '#ffffff' if has_multiple_values else '#333333'
+            stats_bg = '#ff0000' if has_multiple_values else '#ffffff'
+            stats_fg = '#ffffff' if has_multiple_values else '#333333'
+
+            # 属性名称
+            attr_text = tk.Text(row_frame, font=font, width=30, height=row_height,
+                                wrap=tk.WORD, bg=attr_bg, fg=attr_fg, borderwidth=1, relief='solid')
+            attr_text.pack(side=tk.LEFT, padx=5)
+            attr_text.insert(tk.END, attr_name)
+            attr_text.config(state=tk.DISABLED)
+
+            # 统计信息
+            stats_text = tk.Text(row_frame, font=font, width=80, height=row_height,
+                                 wrap=tk.WORD, bg=stats_bg, fg=stats_fg, borderwidth=1, relief='solid')
+            stats_text.pack(side=tk.LEFT, padx=5)
+            stats_text.insert(tk.END, stats)
+            stats_text.config(state=tk.DISABLED)
+
+        # 更新Canvas滚动区域
+        def update_scrollregion(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(canvas_window, width=canvas.winfo_width())
+
+        inner_frame.bind("<Configure>", update_scrollregion)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
+
+        # 鼠标滚轮事件处理
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+
+        canvas.bind('<Enter>', bind_mousewheel)
+        canvas.bind('<Leave>', unbind_mousewheel)
+
+        # 关闭按钮
+        close_button = tk.Button(main_frame, text="关闭", command=stats_window.destroy,
+                                 font=font, width=10, bg="#2196F3", fg="white")
+        close_button.pack(pady=(10, 0))
+
     # 对比按钮
-    compare_button = tk.Button(top_frame, text="对比", command=start_compare, font=font, width=8, bg="#2196F3", fg="white")
+    compare_button = tk.Button(top_frame, text="对比EPLAN属性", command=start_compare, font=big_font, width=14, bg="#2196F3", fg="white")
     compare_button.pack(side=tk.LEFT, padx=5)
 
     # 下方Text区域
@@ -2547,10 +2697,10 @@ def create_gui():
 
     # 左边：识别属性Canvas
     left_frame = tk.Frame(paned_window)
-    paned_window.add(left_frame, width=2 * root.winfo_width() // 3)
+    paned_window.add(left_frame, width=3 * root.winfo_width() // 4)
 
     # 识别Canvas
-    tk.Label(left_frame, text="识别属性", font=font, anchor='w').pack(fill=tk.X, pady=(0, 5))
+    tk.Label(left_frame, text="图纸取值(左) vs EPLAN属性(右)", font=("ABBvoice CNSG", 10, 'bold'), anchor='center').pack(fill=tk.X, pady=(0, 5))
 
     # Canvas框架
     canvas_frame = tk.Frame(left_frame)
@@ -2629,8 +2779,8 @@ def create_gui():
                         if recognized_value != compare_value:
                             differences_found = True
                             compare_text.insert(tk.END, f"\n属性: {attr_name}\n")
-                            compare_text.insert(tk.END, f"识别值: {recognized_value}\n")
-                            compare_text.insert(tk.END, f"对比值: {compare_value}\n")
+                            compare_text.insert(tk.END, f"图纸识别值: {recognized_value}\n")
+                            compare_text.insert(tk.END, f"EPLAN属性值: {compare_value}\n")
                             compare_text.insert(tk.END, "-" * 60 + "\n")
                             # 只对compare_value_text标红，不再对recognized_value_text标红
                             try:
@@ -2659,6 +2809,148 @@ def create_gui():
         compare_text.config(state=tk.DISABLED)
 
     # 导出Excel文件
+    def is_consecutive(station1, station2):
+        """
+        检查两个站号是否连续
+        支持格式：A01, A02...A99, B01...
+        """
+        match1 = re.match(r'^([A-Za-z])(\d{2})$', station1)
+        match2 = re.match(r'^([A-Za-z])(\d{2})$', station2)
+
+        if match1 and match2:
+            letter1, num1 = match1.groups()
+            letter2, num2 = match2.groups()
+
+            if letter1 == letter2:
+                return int(num2) == int(num1) + 1
+
+        return False
+
+    def generate_statistics(station_names, values_by_station):
+        """
+        生成统计信息，将具有相同值的站点分组
+        返回格式：A01: XX\nA02-A08: YY
+        返回：(统计字符串, 值的种类数量)
+        """
+        value_to_stations = {}
+        for station in station_names:
+            value = values_by_station[station]
+            if value not in value_to_stations:
+                value_to_stations[value] = []
+            value_to_stations[value].append(station)
+
+        result = []
+        for value, stations in value_to_stations.items():
+            if not stations:
+                continue
+
+            sorted_stations = sorted(stations)
+
+            grouped_stations = []
+            i = 0
+            while i < len(sorted_stations):
+                start = sorted_stations[i]
+                end = start
+                while i + 1 < len(sorted_stations):
+                    next_station = sorted_stations[i + 1]
+                    if is_consecutive(end, next_station):
+                        end = next_station
+                        i += 1
+                    else:
+                        break
+                if start == end:
+                    grouped_stations.append(start)
+                else:
+                    grouped_stations.append(f"{start}-{end}")
+                i += 1
+
+            stations_str = ", ".join(grouped_stations)
+            result.append(f"{stations_str}: {value}")
+
+        return "\n".join(result), len(value_to_stations)
+
+    def create_summary_sheet(workbook, all_pages_data, thin_border):
+        """
+        创建Summary表单，汇总所有站点的数据
+        第一列：属性
+        第二列：统计（按分类汇总各站的识别值）
+        第三列及以后：各站的识别值，列标题为站名
+        """
+        summary_sheet = workbook.create_sheet(title='Summary', index=0)
+
+        all_attributes = []
+        attr_set = set()
+        for page_data in all_pages_data:
+            for attr in page_data['attributes']:
+                if attr['name'] not in attr_set:
+                    attr_set.add(attr['name'])
+                    all_attributes.append(attr['name'])
+
+        station_names = [page_data['title'] for page_data in all_pages_data]
+
+        summary_sheet['A1'] = "属性"
+        summary_sheet['B1'] = "各站图纸取值对比"
+        for col_idx, station_name in enumerate(station_names, 3):
+            col_letter = chr(ord('A') + col_idx - 1)
+            summary_sheet[f'{col_letter}1'] = station_name
+
+        from openpyxl.styles import Alignment
+        normal_font = styles.Font(name='ABBvoice CNSG')
+        header_font = styles.Font(name='ABBvoice CNSG', bold=True)
+        header_fill = styles.PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
+        wrap_text_alignment = Alignment(wrap_text=True, vertical='top')
+
+        for col in range(1, len(station_names) + 3):
+            col_letter = chr(ord('A') + col - 1)
+            summary_sheet[f'{col_letter}1'].font = header_font
+            summary_sheet[f'{col_letter}1'].fill = header_fill
+            summary_sheet[f'{col_letter}1'].border = thin_border
+            summary_sheet[f'{col_letter}1'].alignment = wrap_text_alignment
+
+        row = 2
+        for attr_name in all_attributes:
+            values_by_station = {}
+            for page_data in all_pages_data:
+                station_name = page_data['title']
+                value = ""
+                for attr in page_data['attributes']:
+                    if attr['name'] == attr_name:
+                        value = attr['recognized_value']
+                        break
+                values_by_station[station_name] = value if value.strip() else " "
+
+            summary_sheet[f'A{row}'] = attr_name
+            summary_sheet[f'A{row}'].border = thin_border
+            summary_sheet[f'A{row}'].alignment = wrap_text_alignment
+            summary_sheet[f'A{row}'].font = normal_font
+
+            for col_idx, station_name in enumerate(station_names, 3):
+                col_letter = chr(ord('A') + col_idx - 1)
+                summary_sheet[f'{col_letter}{row}'] = values_by_station[station_name]
+                summary_sheet[f'{col_letter}{row}'].border = thin_border
+                summary_sheet[f'{col_letter}{row}'].alignment = wrap_text_alignment
+                summary_sheet[f'{col_letter}{row}'].font = normal_font
+
+            stats, value_count = generate_statistics(station_names, values_by_station)
+            summary_sheet[f'B{row}'] = stats
+            summary_sheet[f'B{row}'].border = thin_border
+            summary_sheet[f'B{row}'].alignment = wrap_text_alignment
+            summary_sheet[f'B{row}'].font = normal_font
+
+            # 如果有多种值，标红
+            if value_count > 1:
+                red_fill = styles.PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                summary_sheet[f'A{row}'].fill = red_fill
+                summary_sheet[f'B{row}'].fill = red_fill
+
+            row += 1
+
+        summary_sheet.column_dimensions['A'].width = 50
+        summary_sheet.column_dimensions['B'].width = 80
+        for col_idx in range(len(station_names)):
+            col_letter = chr(ord('C') + col_idx)
+            summary_sheet.column_dimensions[col_letter].width = 80
+
     def export_to_excel():
         """
         导出Excel文件，以站号为Sheet名，将canvas中的属性，识别值，对比值存到excel表单，有差异的属性及识别值，对比值标红
@@ -2697,13 +2989,20 @@ def create_gui():
             workbook = Workbook()
 
             # 定义边框样式
-            from openpyxl.styles import Border, Side
+            from openpyxl.styles import Border, Side, Alignment
             thin_border = Border(
                 left=Side(style='thin'),
                 right=Side(style='thin'),
                 top=Side(style='thin'),
                 bottom=Side(style='thin')
             )
+
+            # 定义自动换行样式
+            wrap_text_alignment = Alignment(wrap_text=True, vertical='top')
+
+            # 定义字体样式为ABBvoice CNSG
+            normal_font = styles.Font(name='ABBvoice CNSG')
+            header_font = styles.Font(name='ABBvoice CNSG', bold=True)
 
             # 遍历所有页面
             for page_data in all_pages_data:
@@ -2718,17 +3017,17 @@ def create_gui():
 
                 # 设置表头
                 sheet['A1'] = "属性"
-                sheet['B1'] = "识别值"
-                sheet['C1'] = "对比值"
+                sheet['B1'] = "图纸识别值"
+                sheet['C1'] = "EPLAN属性值"
 
                 # 设置表头样式
-                header_font = styles.Font(bold=True)
                 header_fill = styles.PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
 
                 for col in ['A', 'B', 'C']:
                     sheet[f'{col}1'].font = header_font
                     sheet[f'{col}1'].fill = header_fill
                     sheet[f'{col}1'].border = thin_border
+                    sheet[f'{col}1'].alignment = wrap_text_alignment
 
                 # 填充数据
                 row = 2
@@ -2756,10 +3055,11 @@ def create_gui():
                     sheet[f'B{row}'] = recognized_value
                     sheet[f'C{row}'] = compare_value
 
-                    # 设置边框
-                    sheet[f'A{row}'].border = thin_border
-                    sheet[f'B{row}'].border = thin_border
-                    sheet[f'C{row}'].border = thin_border
+                    # 设置边框、自动换行和字体
+                    for col in ['A', 'B', 'C']:
+                        sheet[f'{col}{row}'].border = thin_border
+                        sheet[f'{col}{row}'].alignment = wrap_text_alignment
+                        sheet[f'{col}{row}'].font = normal_font
 
                     # 检查是否有差异
                     recognized_value_stripped = str(recognized_value).strip()
@@ -2778,6 +3078,9 @@ def create_gui():
                 sheet.column_dimensions['B'].width = 80
                 sheet.column_dimensions['C'].width = 80
 
+            # 创建Summary表单
+            create_summary_sheet(workbook, all_pages_data, thin_border)
+
             # 删除默认的Sheet
             if 'Sheet' in workbook.sheetnames:
                 workbook.remove(workbook['Sheet'])
@@ -2792,14 +3095,13 @@ def create_gui():
             print(f"导出Excel文件失败：{e}")
 
     # 导出按钮
-    export_button = tk.Button(top_frame, text="导出", command=export_to_excel, font=font, width=8, bg="#FF9800", fg="white")
+    export_button = tk.Button(top_frame, text="导出报表", command=export_to_excel, font=big_font, width=8, bg="#FF9800", fg="white")
     export_button.pack(side=tk.LEFT, padx=5)
 
     # 设置按钮初始状态
     recognize_button.config(state=tk.DISABLED)
     compare_button.config(state=tk.DISABLED)
     export_button.config(state=tk.DISABLED)
-
 
     # 添加鼠标滚轮事件绑定
     def on_mousewheel(event):
