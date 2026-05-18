@@ -1868,7 +1868,7 @@ def create_gui():
     创建GUI界面
     """
     root = tk.Tk()
-    root.title("DrawMaster_DS_V1.0_20260331—DataSheet参数提取及对比工具")
+    root.title("DrawMaster_DS_V1.0_20260518—DataSheet参数提取及对比工具")
     root.geometry("1000x700")
 
     try:
@@ -2539,8 +2539,12 @@ def create_gui():
         # 启用导出按钮
         export_button.config(state=tk.NORMAL)
 
-        # 显示统计信息窗口
-        show_summary_statistics()
+        # 强制刷新主窗口，确保canvas内容绘制完成
+        root.update_idletasks()
+        root.update()
+
+        # 延迟显示统计信息窗口，确保canvas绘制完成
+        root.after(100, show_summary_statistics)
 
     def show_summary_statistics():
         """
