@@ -2553,6 +2553,7 @@ def create_gui():
         if not all_pages_data:
             return
 
+
         # 创建Toplevel窗口
         stats_window = tk.Toplevel(root)
         stats_window.title("各站属性取值对比")
