@@ -1868,7 +1868,7 @@ def create_gui():
     创建GUI界面
     """
     root = tk.Tk()
-    root.title("DrawMaster_DS_V1.0_20260518—DataSheet参数提取及对比工具")
+    root.title("DrawingMaster_DS_V1.0_20260526—DataSheet参数提取及对比工具")
     root.geometry("1000x700")
 
     try:
@@ -1972,9 +1972,9 @@ def create_gui():
         # 清空左边识别结果
         recognition_text.config(state=tk.NORMAL)
         recognition_text.delete(1.0, tk.END)
-        recognition_text.insert(tk.END, f"{'-' * 60}\n")
+        recognition_text.insert(tk.END, f"{'-' * 56}\n")
         recognition_text.insert(tk.END, f"开始处理: {pdf_path}\n")
-        recognition_text.insert(tk.END, f"{'-' * 60}\n")
+        recognition_text.insert(tk.END, f"{'-' * 56}\n")
         recognition_text.config(state=tk.DISABLED)
 
         # 清空左边Canvas
@@ -2360,6 +2360,84 @@ def create_gui():
         )
 
         if compare_file:
+            # ========================================
+            # 预处理：处理1-15-2单元格数据
+            # ========================================
+            try:
+                wb_preprocess = load_workbook(compare_file)
+                if 'Z8_xlsx' in wb_preprocess.sheetnames:
+                    ws_preprocess = wb_preprocess['Z8_xlsx']
+                    max_row_preprocess = ws_preprocess.max_row
+                    max_col_preprocess = ws_preprocess.max_column
+
+                    # 定义1-15-2的特殊处理函数
+                    def process_1_15_2_value(raw_value, value_14, value_15_1):
+                        """
+                        处理1-15-2的特殊取值逻辑
+                        原始数据是由║拼接的多个子字符串，每个子字符串格式：=│??_??@内容1;│??_??@内容2;
+                        根据1-14和1-15-1的值找到匹配的子字符串，取第二个│??_??@后面的内容
+                        如果找不到匹配内容，保持原始的raw_value
+                        """
+                        if not raw_value or not value_14 or not value_15_1:
+                            return raw_value if raw_value else " "
+
+                        # 构建查找字符串：??_??@{1-14的值}{1-15-1的值};
+                        search_pattern = f"??_??@{value_14}{value_15_1};"
+
+                        # 将原始数据按║分割成子字符串列表
+                        substrings = raw_value.split('║')
+
+                        # 遍历每个子字符串，查找匹配的
+                        for substring in substrings:
+                            # 每个子字符串应该以=开头
+                            if substring.startswith('=') and search_pattern in substring:
+                                # 找到匹配的子字符串，提取内容
+                                # 格式：=│??_??@内容1;│??_??@内容2;
+                                # 我们需要取第二个│??_??@后面的内容
+                                parts = substring.split('│??_??@')
+                                if len(parts) >= 3:
+                                    # 第二个│??_??@后面的内容是parts[2]
+                                    value_part = parts[2].strip()
+                                    # 去除末尾的分号
+                                    if value_part.endswith(';'):
+                                        value_part = value_part[:-1]
+                                    return value_part if value_part else raw_value
+
+                        # 找不到匹配内容，保持原始raw_value
+                        return raw_value
+
+                    # 先收集1-14和1-15-1的值
+                    raw_1_14_data = ""
+                    raw_1_15_1_data = ""
+                    raw_1_15_2_data = ""
+                    target_row = -1
+
+                    for row in range(1, max_row_preprocess + 1):
+                        if max_col_preprocess >= 2:
+                            key = ws_preprocess.cell(row=row, column=1).value
+                            value = ws_preprocess.cell(row=row, column=2).value
+                            if key:
+                                if '1-14 ' in str(key):
+                                    raw_1_14_data = str(value) if value else ""
+                                elif '1-15-1 ' in str(key):
+                                    raw_1_15_1_data = str(value) if value else ""
+                                elif '1-15-2 ' in str(key):
+                                    raw_1_15_2_data = str(value) if value else ""
+                                    target_row = row
+
+                    # 处理1-15-2的值并写回
+                    if target_row != -1 and raw_1_15_2_data and raw_1_14_data and raw_1_15_1_data:
+                        # print('raw_1_14_data', raw_1_14_data)
+                        # print('raw_1_15_1_data', raw_1_15_1_data)
+                        # print('raw_1_15_2_data', raw_1_15_2_data)
+                        processed_value = process_1_15_2_value(raw_1_15_2_data, raw_1_14_data, raw_1_15_1_data)
+                        # print('processed_value', processed_value)
+                        ws_preprocess.cell(row=target_row, column=2, value=processed_value)
+                        wb_preprocess.save(compare_file)
+                        # print(f"已预处理1-15-2单元格，处理后的值: {processed_value}")
+            except Exception as e:
+                # print(f"预处理1-15-2单元格失败: {e}")
+                pass
             # 获取当前生成的Excel文件路径
             table_output_folder = 'crop/extracted_tables'
             pdf_filename = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -2424,6 +2502,7 @@ def create_gui():
                                                 if height is not None and height != station_data[station_str].get('低压室高度'):
                                                     station_data[station_str]['低压室高度'] = height
                             # 读取所有行数据，存储为字典，键为A列的值，值为B列的值
+                            # 1-15-2的特殊处理已在预处理阶段完成
                             for row in range(1, max_row + 1):
                                 if max_col >= 2:
                                     key = ws.cell(row=row, column=1).value
@@ -2442,6 +2521,7 @@ def create_gui():
 
                             # 遍历所有属性名称，根据EPLAN报表序号查找对比值
                             for attr_name in canvas_inner_frame.compare_value_texts.keys():
+                                # print(attr_name)
                                 # 处理主母线电流和低压室高度的特殊情况
                                 # 处理属性名称中带有冒号的情况
                                 normalized_attr_name = attr_name.rstrip(':')
@@ -2496,7 +2576,8 @@ def create_gui():
                                 if attr_name == "内部燃弧等级" and attr_name in compare_values:
                                     compare_values[attr_name] = "IAC " + compare_values[attr_name]
                         else:
-                            print("对比文件中没有Z8_xlsx表单")
+                            messagebox.showerror('错误', '对比文件中没有Z8_xlsx表单')
+                            # print("对比文件中没有Z8_xlsx表单")
 
                         # 填充对比值到compare_value_text
                         # 只处理当前存在的Text组件
@@ -2529,7 +2610,8 @@ def create_gui():
                         show_current_page_comparison()
 
                 except Exception as e:
-                    print(f"填充对比值出错: {e}")
+                    # print(f"填充对比值出错: {e}")
+                    messagebox.showerror('错误', f"填充对比值出错: {e}")
                     compare_text.config(state=tk.NORMAL)
                     compare_text.insert(tk.END, f"对比出错: {e}\n")
                     compare_text.config(state=tk.DISABLED)
@@ -2552,7 +2634,6 @@ def create_gui():
         """
         if not all_pages_data:
             return
-
 
         # 创建Toplevel窗口
         stats_window = tk.Toplevel(root)
@@ -2702,7 +2783,7 @@ def create_gui():
 
     # 左边：识别属性Canvas
     left_frame = tk.Frame(paned_window)
-    paned_window.add(left_frame, width=3 * root.winfo_width() // 4)
+    paned_window.add(left_frame, width=5 * root.winfo_width() // 6)
 
     # 识别Canvas
     tk.Label(left_frame, text="图纸取值(左) vs EPLAN属性(右)", font=("ABBvoice CNSG", 10, 'bold'), anchor='center').pack(fill=tk.X, pady=(0, 5))
@@ -2739,7 +2820,7 @@ def create_gui():
         compare_text.config(state=tk.NORMAL)
         compare_text.delete(1.0, tk.END)
         compare_text.insert(tk.END, "当前页对比结果:\n")
-        compare_text.insert(tk.END, "-" * 60 + "\n")
+        compare_text.insert(tk.END, "-" * 56 + "\n")
 
         # 检查是否有识别值和对比值
         if hasattr(canvas_inner_frame, 'recognized_value_texts') and hasattr(canvas_inner_frame, 'compare_value_texts'):
@@ -2786,7 +2867,7 @@ def create_gui():
                             compare_text.insert(tk.END, f"\n属性: {attr_name}\n")
                             compare_text.insert(tk.END, f"图纸识别值: {recognized_value}\n")
                             compare_text.insert(tk.END, f"EPLAN属性值: {compare_value}\n")
-                            compare_text.insert(tk.END, "-" * 60 + "\n")
+                            compare_text.insert(tk.END, "-" * 56 + "\n")
                             # 只对compare_value_text标红，不再对recognized_value_text标红
                             try:
                                 compare_text_widget.config(state=tk.NORMAL)
