@@ -814,7 +814,8 @@ def extract_valid_rectangles(pdf_path, page_number, search_terms, output_image_p
 
                             if i == 0:  # 第一个字符串区域
                                 # 竖向分割线位置在表格横向的39.5/127和66/127
-                                div1 = r_left + (39.5 / 127) * region_width
+                                # div1 = r_left + (39.5 / 127) * region_width
+                                div1 = r_left + (31.48 / 127) * region_width
                                 div2 = r_left + (66 / 127) * region_width
                                 vertical_dividers = [div1, div2]
                             elif i in [1, 2]:  # 第二个和第三个字符串区域
@@ -1453,6 +1454,8 @@ def extract_valid_rectangles(pdf_path, page_number, search_terms, output_image_p
                                                             merged_text += " " + col3_plus_text
                                                         else:
                                                             merged_text = col3_plus_text
+                                                    # print(merged_text)
+                                                    merged_text = merged_text.replace('mm m²', 'mm²')
                                                 else:
                                                     # 对于其他行，遍历第2到其后的每一列，对空单元格替换为空格
                                                     column_texts = []
@@ -1868,7 +1871,7 @@ def create_gui():
     创建GUI界面
     """
     root = tk.Tk()
-    root.title("DrawingMaster_DS_V1.0_20260526—DataSheet参数提取及对比工具")
+    root.title("DrawingMaster_DS_V1.0_20260605—DataSheet参数提取及对比工具")
     root.geometry("1000x700")
 
     try:
@@ -2124,7 +2127,7 @@ def create_gui():
                                 if table_idx == max_table_idx and len(row) == 1 and row[0]:
                                     # 特殊处理：当table_idx为最大值时，len(row) == 1且row[0]存在
                                     attr_name = "包装发运"
-                                    attr_value = row[0]
+                                    attr_value = row[0].replace('\n', ' ')
                                 elif len(row) >= 2:
                                     # 将row[1]及其后的元素用\n拼接
                                     attr_name = row[0]
@@ -2370,38 +2373,99 @@ def create_gui():
                     max_row_preprocess = ws_preprocess.max_row
                     max_col_preprocess = ws_preprocess.max_column
 
+                    # 颜色中英文映射字典
+                    color_mapping = {
+                        '红': 'RED',
+                        '黄': 'YELLOW',
+                        '绿': 'GREEN',
+                        '蓝': 'BLUE',
+                        '白': 'WHITE',
+                        '黑': 'BLACK',
+                        '棕': 'BROWN',
+                        '灰': 'GREY',
+                        '紫': 'PURPLE',
+                        '浅棕': 'LIGHT BROWN',
+                        '银灰': 'SILVER GRAY'
+                    }
+
+                    # 反向映射：英文到中文
+                    color_mapping_reverse = {v: k for k, v in color_mapping.items()}
+
+                    def translate_color(value):
+                        """
+                        将颜色值在中英文之间转换
+                        如果是中文颜色，转换为英文；如果是英文颜色，转换为中文
+                        """
+                        if not value:
+                            return value
+
+                        # 检查是否包含中文颜色
+                        has_chinese = any(c in color_mapping for c in value)
+                        has_english = any(c in color_mapping_reverse for c in value.split('-'))
+
+                        if has_chinese:
+                            # 中文转英文
+                            result = []
+                            for color in value.split('-'):
+                                if color in color_mapping:
+                                    result.append(color_mapping[color])
+                                else:
+                                    result.append(color)
+                            return '-'.join(result)
+                        elif has_english:
+                            # 英文转中文
+                            result = []
+                            for color in value.split('-'):
+                                color_upper = color.strip().upper()
+                                if color_upper in color_mapping_reverse:
+                                    result.append(color_mapping_reverse[color_upper])
+                                else:
+                                    result.append(color)
+                            return '-'.join(result)
+                        return value
+
                     # 定义1-15-2的特殊处理函数
                     def process_1_15_2_value(raw_value, value_14, value_15_1):
                         """
                         处理1-15-2的特殊取值逻辑
                         原始数据是由║拼接的多个子字符串，每个子字符串格式：=│??_??@内容1;│??_??@内容2;
                         根据1-14和1-15-1的值找到匹配的子字符串，取第二个│??_??@后面的内容
+                        支持中英文颜色匹配
                         如果找不到匹配内容，保持原始的raw_value
                         """
                         if not raw_value or not value_14 or not value_15_1:
                             return raw_value if raw_value else " "
 
-                        # 构建查找字符串：??_??@{1-14的值}{1-15-1的值};
-                        search_pattern = f"??_??@{value_14}{value_15_1};"
-
                         # 将原始数据按║分割成子字符串列表
                         substrings = raw_value.split('║')
 
+                        # 尝试用原始颜色值匹配
+                        search_pattern = f"??_??@{value_14}{value_15_1};"
+
                         # 遍历每个子字符串，查找匹配的
                         for substring in substrings:
-                            # 每个子字符串应该以=开头
                             if substring.startswith('=') and search_pattern in substring:
-                                # 找到匹配的子字符串，提取内容
-                                # 格式：=│??_??@内容1;│??_??@内容2;
-                                # 我们需要取第二个│??_??@后面的内容
                                 parts = substring.split('│??_??@')
                                 if len(parts) >= 3:
-                                    # 第二个│??_??@后面的内容是parts[2]
                                     value_part = parts[2].strip()
-                                    # 去除末尾的分号
                                     if value_part.endswith(';'):
                                         value_part = value_part[:-1]
                                     return value_part if value_part else raw_value
+
+                        # 如果原始颜色值没有匹配到，尝试转换颜色后匹配
+                        # 原始数据中的颜色是中文，所以如果value_15_1是英文，需要转换为中文
+                        translated_color = translate_color(value_15_1)
+                        # print(translated_color)
+                        if translated_color != value_15_1:
+                            search_pattern_translated = f"??_??@{value_14}{translated_color};"
+                            for substring in substrings:
+                                if substring.startswith('=') and search_pattern_translated in substring:
+                                    parts = substring.split('│??_??@')
+                                    if len(parts) >= 3:
+                                        value_part = parts[2].strip()
+                                        if value_part.endswith(';'):
+                                            value_part = value_part[:-1]
+                                        return value_part if value_part else raw_value
 
                         # 找不到匹配内容，保持原始raw_value
                         return raw_value
