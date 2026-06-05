@@ -1,25 +1,11 @@
 import pdfplumber
 import os
-import sys
 import PyPDF2
 import fitz
 import re
 from openpyxl import Workbook, load_workbook, styles
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-
-
-def resource_path(relative_path):
-    """
-    获取资源文件的绝对路径，支持PyInstaller打包后的环境
-    """
-    try:
-        # PyInstaller创建的临时目录
-        base_path = sys._MEIPASS
-    except Exception:
-        # 正常开发环境
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
 
 
 def extract_switchgear_number(title):
@@ -1888,13 +1874,10 @@ def create_gui():
     root.title("DrawingMaster_DS_V1.0_20260605—DataSheet参数提取及对比工具")
     root.geometry("1000x700")
 
-    # 设置窗口图标，支持PyInstaller打包环境
-    icon_path = resource_path("logo.ico")
-    if os.path.exists(icon_path):
-        try:
-            root.iconbitmap(icon_path)
-        except Exception:
-            pass  # 如果图标文件不存在或加载失败，忽略错误
+    try:
+        root.iconbitmap("logo.ico")
+    except Exception:
+        pass  # 如果图标文件不存在，忽略错误
 
     # 窗口最大化
     root.state('zoomed')
@@ -2722,10 +2705,7 @@ def create_gui():
         stats_window.geometry("1000x800")
         stats_window.transient(root)  # 设置为父窗口的临时窗口
         stats_window.grab_set()  # 模态窗口
-        # 设置窗口图标，支持PyInstaller打包环境
-        icon_path = resource_path("logo.ico")
-        if os.path.exists(icon_path):
-            stats_window.iconbitmap(icon_path)
+        stats_window.iconbitmap("logo.ico")
         # 窗口居中显示
         stats_window.update_idletasks()
         screen_width = stats_window.winfo_screenwidth()
@@ -2852,16 +2832,6 @@ def create_gui():
         close_button = tk.Button(main_frame, text="关闭", command=stats_window.destroy,
                                  font=font, width=10, bg="#2196F3", fg="white")
         close_button.pack(pady=(10, 0))
-
-        # 强制刷新窗口，确保所有控件都正确显示
-        # 在PyInstaller打包环境中，需要显式触发布局和绘制
-        inner_frame.update_idletasks()
-        canvas.update_idletasks()
-        stats_window.update_idletasks()
-        stats_window.update()
-
-        # 手动更新Canvas滚动区域
-        canvas.configure(scrollregion=canvas.bbox("all"))
 
     # 对比按钮
     compare_button = tk.Button(top_frame, text="对比EPLAN属性", command=start_compare, font=big_font, width=14, bg="#2196F3", fg="white")
